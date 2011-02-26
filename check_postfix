@@ -1,0 +1,102 @@
+#!/bin/bash
+#
+# Postfix process monitor plugin for Nagios
+# 
+# Usage: ./check_postfix
+
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+STATE_UNKNOWN=3
+
+# You may have to change this, depending on where you installed your
+# Nagios plugins
+#PATH="/usr/bin:/usr/sbin:/bin:/sbin"
+#LIBEXEC="/usr/local/nagios/libexec"
+#. $LIBEXEC/utils.sh
+
+print_usage() {
+    echo "Usage: $PROGNAME"
+    echo "Usage: $PROGNAME --help"
+}
+
+print_help() {
+    echo ""
+    print_usage
+    echo ""
+    echo "Postfix monitor plugin for Nagios"
+    echo ""
+    echo "This plugin not developped by the Nagios Plugin group."
+    echo "Please do not e-mail them for support on this plugin, since"
+    echo "they won't know what you're talking about :P"
+    echo ""
+    echo "For contact info, read the plugin itself..."
+}
+
+while test -n "$1" 
+do
+    case "$1" in
+      --help) print_help; exit $STATE_OK;;
+      -h) print_help; exit $STATE_OK;;
+      *) print_usage; exit $STATE_UNKNOWN;;
+    esac
+done
+
+proc_not_running_=""
+add_proc_not_running() {
+    if [[ $proc_not_running_ == "" ]]; then
+        proc_not_running_="$1"
+    else
+        proc_not_running_="$proc_not_running_ $1"
+    fi
+}
+
+check_processes()
+{
+    PROCESS="0"
+    PROCLIST="qmgr pickup master"
+    local proc_list="$(ps -ef)"
+    for PROC in `echo $PROCLIST`; do
+    if [ `echo "$proc_list" | grep $PROC | grep -v grep | wc -l` -lt 1 ]; then 
+        if [ $PROC == "smtpd" ]; then
+            if [ `ps -ef | grep proxymap | grep -v grep | wc -l` -lt 1 ]; then
+                PROCESS=1
+                add_proc_not_running "$PROC"
+            else
+                PROCESS=0
+            fi
+        else
+            PROCESS=1
+            add_proc_not_running "$PROC"
+        fi
+    fi
+    done
+
+    if [ $PROCESS -eq 1 ]; then 
+        echo "SMTP-S NOK - One or more processes not running ($proc_not_running_)"
+        exitstatus=$STATE_CRITICAL
+        exit $exitstatus
+    fi
+}
+
+check_ports()
+{
+    PORTS="0"
+    PORTLIST="25"
+    for NUM in `echo $PORTLIST`; do
+    if [ `netstat -an | grep LISTEN | grep $NUM | grep -v grep | wc -l` -lt 1 ]; then PORTS=1;fi
+    done
+
+    if [ $PORTS -eq 1 ]; then 
+        echo "SMTP-S NOK - One or more TCP/IP ports not listening."
+        exitstatus=$STATE_CRITICAL
+        exit $exitstatus
+    fi
+}
+
+check_processes
+check_ports
+
+echo "SMTP-S OK - Everything running like it should"
+exitstatus=$STATE_OK
+exit $exitstatus
