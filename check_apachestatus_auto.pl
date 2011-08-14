@@ -265,7 +265,8 @@ if ($response->is_success) {
   	}
   }
  
-  my $CountOpenSlots = ($ScoreBoard =~ tr/\.//);
+  #my $CountOpenSlots = ($ScoreBoard =~ tr/\.//);
+  my $CountOpenSlots = 0;
   my $TotalSlots = $CountOpenSlots+$IdleWorkers+$BusyWorkers;
   my $InfoData = '';
   my $PerfData = '';
