@@ -30,6 +30,7 @@ use Digest::MD5 qw(md5 md5_hex);
 # Nagios specific
 
 use lib "/usr/local/nagios/libexec";
+use lib "/usr/lib/nagios/plugins";      # for debian
 use utils qw(%ERRORS $TIMEOUT);
 #my %ERRORS=('OK'=>0,'WARNING'=>1,'CRITICAL'=>2,'UNKNOWN'=>3,'DEPENDENT'=>4);
 
