@@ -94,10 +94,10 @@ sub help {
 -t, --timeout=INTEGER
    timeout in seconds (Default: $o_timeout)
 -w, --warn=MIN
-   number of available slots that will cause a warning
+   percent of idle slots left that will cause a warning
    -1 for no warning
 -c, --critical=MIN
-   number of available slots that will cause an error
+   percent of idle slots left that will cause an error
 -V, --version
    prints version number
 Note :
@@ -138,7 +138,8 @@ sub check_options {
   if (((defined($o_warn_level) && !defined($o_crit_level)) || 
       (!defined($o_warn_level) && defined($o_crit_level))) || 
       ((defined($o_warn_level) && defined($o_crit_level)) && 
-       (($o_warn_level != -1) &&  ($o_warn_level <= $o_crit_level))
+       (($o_warn_level != -1) &&  ($o_warn_level <= $o_crit_level) ||
+       ($o_warn_level >= 100) || ($o_crit_level >= 100))
       )
      ) { 
     print "Check warn and crit!\n"; print_usage(); exit $ERRORS{"UNKNOWN"}
@@ -270,12 +271,18 @@ if ($response->is_success) {
   my $TotalSlots = $CountOpenSlots+$IdleWorkers+$BusyWorkers;
   my $InfoData = '';
   my $PerfData = '';
- 
+  my $IdleWorkersPercent = 0;
+
+  if ($BusyWorkers == 0) {
+      $IdleWorkersPercent = 100;
+  } else {
+      $IdleWorkersPercent = 100-(($BusyWorkers/($CountOpenSlots + $TotalSlots))*100);
+  }
 
  if ($httpserver eq 'APACHE')
  {
- 	 $InfoData = sprintf ("- %.3f sec. response time, Busy/Idle %d/%d, open %d/%d, ReqPerSec %.1f, BytesPerReq %d, ".
-  												"BytesPerSec %d", $timeelapsed, $BusyWorkers, $IdleWorkers, $CountOpenSlots, $TotalSlots, 
+ 	 $InfoData = sprintf ("- %.3f sec. response time, Idle %d%%, Busy/Idle %d/%d, open %d/%d, ReqPerSec %.1f, BytesPerReq %d, ".
+  												"BytesPerSec %d", $timeelapsed, $IdleWorkersPercent, $BusyWorkers, $IdleWorkers, $CountOpenSlots, $TotalSlots, 
   												$ReqPerSec, $BytesPerReq, $BytesPerSec);
 
 	 $PerfData = sprintf ("Idle=%d Busy=%d OpenSlots=%d Slots=%d Starting=%d Reading=%d Sending=%d Keepalive=%d ".
@@ -287,8 +294,8 @@ if ($response->is_success) {
  }
  else
  {
- 	 $InfoData = sprintf ("- %.3f sec. response time, Busy/Idle %d/%d, slots %d, ReqPerSec %.1f, BytesPerReq %d, ".
-  												"BytesPerSec %d", $timeelapsed, $BusyWorkers, $IdleWorkers, $TotalSlots, 
+ 	 $InfoData = sprintf ("- %.3f sec. response time, Idle %d%%, Busy/Idle %d/%d, slots %d, ReqPerSec %.1f, BytesPerReq %d, ".
+  												"BytesPerSec %d", $timeelapsed, $IdleWorkersPercent, $BusyWorkers, $IdleWorkers, $TotalSlots, 
   												$ReqPerSec, $BytesPerReq, $BytesPerSec);
 
 	 $PerfData = sprintf ("Idle=%d Busy=%d Slots=%d ".
@@ -306,15 +313,14 @@ if ($response->is_success) {
  } 	 						
   
   
-  
   if (defined($o_crit_level) && ($o_crit_level != -1)) {
-    if (($CountOpenSlots + $IdleWorkers) <= $o_crit_level) {
+    if ($IdleWorkersPercent <= $o_crit_level) {
       print($httpserver." CRITICAL ".$InfoData.'|'.$PerfData);
       exit $ERRORS{"CRITICAL"}
     }
   } 
   if (defined($o_warn_level) && ($o_warn_level != -1)) {
-    if (($CountOpenSlots + $IdleWorkers) <= $o_warn_level) {
+    if ($IdleWorkersPercent <= $o_warn_level) {
       print($httpserver." WARNING ".$InfoData.'|'.$PerfData);
       exit $ERRORS{"WARNING"}
     }
