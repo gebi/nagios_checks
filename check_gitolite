@@ -1,8 +1,11 @@
 #!/bin/bash
 #
 # Gitolite nagios check to fsck all repositories
-# 
+#
 # Usage: check_gitolite user <git repos>
+#
+# Copyright: Michael Gebetsroither <michael@mgeb.org> (2013)
+# License:   GPLv2
 
 STATE_OK=0
 STATE_WARNING=1
