@@ -1,0 +1,75 @@
+#!/bin/bash
+#
+# Gitolite nagios check to fsck all repositories
+# 
+# Usage: check_gitolite user <git repos>
+
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+STATE_UNKNOWN=3
+
+CHECK_NAME="check_gitolite"
+if [[ $MIN_REPOS == "" ]]; then
+    MIN_REPOS=1
+fi
+
+die() {
+    local prio_="$1"; shift
+    echo "$CHECK_NAME - $@"
+    exit $prio_
+}
+
+print_status() {
+    local msg_="$1"
+    echo "$CHECK_NAME $msg_ for gitolite:${user_} ($num_repos_) | num_repos=${num_repos_};$MIN_REPOS;$MIN_REPOS;$num_repos_;"
+}
+
+check_repos() {
+    local repos_="$1"
+    local out_="/dev/null"
+    local nagios_ret_=0
+    local log_=""
+    local user_="`id -u -n`" || die $STATE_UNKNOWN "Could not get username"
+    
+    log_=`mktemp -t "${CHECK_NAME}_XXXXXXXXXXXX"` || die $STATE_UNKNOWN "Could not create tmp file"
+
+    find "${repos_}" -type d -name '*.git' -print0 | \
+        xargs -0r -n1 -i /bin/bash -c \
+        "echo {} 1>&2; echo {} >>$log_; git --bare --git-dir={} fsck --strict --full 1>&2 || exit 1" >/dev/null
+    local ret_=$?
+
+    num_repos_="`wc -l $log_ |cut -f1 -d \ `"
+    if [[ $ret_ == 0 ]]; then
+        if (( $MIN_REPOS > 0 && $num_repos_ < $MIN_REPOS )); then
+            print_status "WARNING - NO fsck errors but MISSING repos"
+            nagios_ret_=$STATE_WARNING
+        else
+            print_status "OK - Git fsck run successfully"
+            nagios_ret_=$STATE_OK
+        fi
+    else
+        print_status "CRITICAL - Git fsck detected errors"
+        nagios_ret_=$STATE_CRITICAL
+    fi
+    rm $log_
+    exit $nagios_ret_
+}
+
+if [[ $# != 0 ]]; then
+    if [[ $1 == "--min" ]]; then
+        MIN_REPOS="$2"
+        shift; shift
+    fi
+    # initial call
+    export GITOLITE_DIR="$2"
+    export MIN_REPOS
+    su "$1" "$0"
+else
+    # self call through su
+    if [ `id -u` -eq 0 ]; then
+        die $STATE_UNKNOWN "Running as root not supported!"
+    fi
+
+    check_repos "$GITOLITE_DIR"
+fi
