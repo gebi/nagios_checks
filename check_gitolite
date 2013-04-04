@@ -13,6 +13,8 @@ STATE_CRITICAL=2
 STATE_UNKNOWN=3
 
 CHECK_NAME="check_gitolite"
+CACHE_DIR="/var/cache/$CHECK_NAME"
+CACHE_FILE=""
 if [[ $MIN_REPOS == "" ]]; then
     MIN_REPOS=1
 fi
@@ -59,15 +61,84 @@ check_repos() {
     exit $nagios_ret_
 }
 
+cached_check()
+{
+    CACHE_FILE="${CACHE_DIR}/$USER"
+    CACHE_FILE_RET="${CACHE_DIR}/${USER}.ret"
+    CACHE_FILE_NEW="${CACHE_DIR}/${USER}.new"
+    UPDATE_CACHEFILE="true"
+    STALE_CACHEFILE="false"
+
+    # Check if cache file exists and is recent enough
+    if [ -s "$CACHE_FILE" ] ; then
+        local now_=$(date +%s)
+        local mtime_=$(stat -c %Y "$CACHE_FILE")
+        if (( $((now_ - mtime_)) <= $AGE )); then UPDATE_CACHEFILE="false"; fi
+        if (( $((now_ - mtime_)) <= $MAX_AGE )); then
+            cat "$CACHE_FILE"
+            RET_="`cat $CACHE_FILE_RET|head -n1`"
+        else
+            STALE_CACHEFILE="true"
+        fi
+    fi
+
+    # outdated cachefile and update process still not running, refresh cache file
+    if [ "$UPDATE_CACHEFILE" = "true" -a ! -e "$CACHE_FILE_NEW" ] ; then
+        (
+            touch $CACHE_FILE_NEW
+            su "$USER" "$PROG" >$CACHE_FILE_NEW
+            ret_=$?
+            if [[ $ret_ == "0" ]]; then
+                mv -f $CACHE_FILE_NEW $CACHE_FILE
+                echo "$ret_" >$CACHE_FILE_RET
+            else
+                rm -f $CACHE_FILE $CACHE_FILE_NEW $CACHE_FILE_RET
+            fi
+        ) & # <--- BACKGROUND
+    fi
+
+    if [[ $RET_ != "" ]]; then
+        exit $RET_
+    fi
+
+    if [[ $STALE_CACHEFILE == "true" ]]; then
+        die $STATE_UNKNOWN "stale cache file"
+    else
+        die $STATE_UNKNOWN "no cache file"
+    fi
+}
+
+
+###
+## MAIN
+###
+
+if [ ! -d $CACHE_DIR ]; then mkdir -p $CACHE_DIR || die $STATE_UNKNOWN "Could not create cache directory" ; fi
+
 if [[ $# != 0 ]]; then
+    cached_="false"
+    # initial call
+    if [[ $1 == "--cached" ]]; then
+        cached_="true"
+        AGE="$2"
+        MAX_AGE="$3"
+        shift; shift; shift
+    fi
     if [[ $1 == "--min" ]]; then
         MIN_REPOS="$2"
         shift; shift
     fi
-    # initial call
+    USER="$1"
+    PROG="$0"
     export GITOLITE_DIR="$2"
     export MIN_REPOS
-    su "$1" "$0"
+
+    if [[ $cached_ == "true" ]]; then
+        echo "$CHECK_NAME - CACHED CONTENT" >&2
+        cached_check
+    else
+        su "$USER" "$PROG"
+    fi
 else
     # self call through su
     if [ `id -u` -eq 0 ]; then
