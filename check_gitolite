@@ -50,7 +50,7 @@ check_repos() {
             print_status "WARNING - NO fsck errors but MISSING repos"
             nagios_ret_=$STATE_WARNING
         else
-            print_status "OK - Git fsck run successfully"
+            print_status "OK - Git fsck run successful"
             nagios_ret_=$STATE_OK
         fi
     else
