@@ -2,7 +2,15 @@
 #
 # Gitolite nagios check to fsck all repositories
 #
-# Usage: check_gitolite user <git repos>
+# Usage: check_gitolite --cached <update_time> <stale_time> --min <min_repos> USER GIT_REPO_PATH
+#
+# --cached
+#     update_time - after this time the cache will be regenerated
+#     stale_time  - after this time the cache will be considered stale and not be used anymore
+#
+# --min
+#     min_repos - minimum number of repos that need to be available, otherwise STATE_WARNING
+#                     default = 1, set to 0 to disable this check
 #
 # Copyright: Michael Gebetsroither <michael@mgeb.org> (2013)
 # License:   GPLv2
