@@ -96,7 +96,7 @@ cached_check()
             touch $CACHE_FILE_NEW
             su "$USER" "$PROG" >$CACHE_FILE_NEW
             ret_=$?
-            if [[ $ret_ == "0" ]]; then
+            if [ -s "$CACHE_FILE_NEW" ]; then
                 mv -f $CACHE_FILE_NEW $CACHE_FILE
                 echo "$ret_" >$CACHE_FILE_RET
             else
