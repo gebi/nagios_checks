@@ -49,7 +49,7 @@ check_repos() {
 
     find "${repos_}" -type d -name '*.git' -print0 | \
         xargs -0r -n1 -i /bin/bash -c \
-        "echo {} 1>&2; echo {} >>$log_; git --bare --git-dir={} fsck --strict --full 1>&2 || exit 1" >/dev/null
+        "echo {} 1>&2; echo {} >>$log_; nice git --bare --git-dir={} fsck --strict --full 1>&2 || exit 1" >/dev/null
     local ret_=$?
 
     num_repos_="`wc -l $log_ |cut -f1 -d \ `"
